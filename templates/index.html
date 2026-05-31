@@ -1,0 +1,634 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Classroom Attention Analyzer</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:     #0c1420;
+    --panel:  rgba(20,32,54,0.85);
+    --border: rgba(99,179,237,0.15);
+    --accent: #3b82f6;
+    --green:  #22c55e;
+    --orange: #f97316;
+    --red:    #ef4444;
+    --purple: #a855f7;
+    --cyan:   #06b6d4;
+    --yellow: #eab308;
+    --text:   #e2e8f0;
+    --muted:  #94a3b8;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Inter', sans-serif;
+    background: var(--bg) url('/static/image/gemini.png') center/cover fixed;
+    color: var(--text);
+    min-height: 100vh;
+  }
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background: rgba(12,20,32,0.82);
+    z-index: 0;
+  }
+  #app { position: relative; z-index: 1; padding: 20px; max-width: 1400px; margin: auto; }
+
+  /* ── Header ── */
+  .header {
+    display: flex; align-items: center; justify-content: space-between;
+    flex-wrap: wrap; gap: 12px;
+    margin-bottom: 20px;
+    padding: 16px 20px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    backdrop-filter: blur(12px);
+  }
+  .header h1 {
+    font-size: 1.45rem; font-weight: 700;
+    background: linear-gradient(90deg, #60a5fa, #a78bfa);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  }
+  .header p { font-size: .82rem; color: var(--muted); margin-top: 2px; }
+  .status-pill {
+    display: flex; align-items: center; gap: 8px;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid var(--border);
+    padding: 6px 14px; border-radius: 99px; font-size: .8rem;
+  }
+  .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--green); }
+  .dot.off { background: #475569; animation: none; }
+  .dot { animation: pulse 1.6s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+  /* ── Grid layout ── */
+  .grid { display: grid; grid-template-columns: 1fr 340px; gap: 18px; }
+  @media(max-width:900px){ .grid { grid-template-columns: 1fr; } }
+
+  /* ── Panel ── */
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 18px;
+    backdrop-filter: blur(12px);
+  }
+  .panel-title {
+    font-size: .75rem; font-weight: 600; text-transform: uppercase;
+    letter-spacing: .08em; color: var(--muted); margin-bottom: 14px;
+  }
+
+  /* ── Video ── */
+  .video-wrap {
+    position: relative;
+    background: #000;
+    border-radius: 10px;
+    overflow: hidden;
+    aspect-ratio: 4/3;
+    border: 2px solid rgba(99,179,237,0.2);
+  }
+  .video-wrap img { width: 100%; height: 100%; object-fit: contain; display: block; }
+  .video-timer {
+    position: absolute; top: 10px; right: 10px;
+    background: rgba(0,0,0,0.65);
+    font-size: 1rem; font-family: monospace; font-weight: 600;
+    color: var(--green);
+    padding: 4px 10px; border-radius: 6px;
+  }
+  .rec-badge {
+    position: absolute; top: 10px; left: 10px;
+    background: rgba(239,68,68,0.85);
+    font-size: .7rem; font-weight: 700; letter-spacing: .06em;
+    color: #fff; padding: 3px 9px; border-radius: 99px;
+    display: flex; align-items: center; gap: 5px;
+  }
+  .rec-dot { width:7px;height:7px;border-radius:50%;background:#fff;animation:pulse 1s infinite; }
+
+  /* ── Camera controls ── */
+  .cam-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+  select, input[type=text], input[type=email], input[type=password] {
+    background: rgba(255,255,255,0.07);
+    border: 1px solid var(--border);
+    color: var(--text); border-radius: 8px; padding: 7px 10px;
+    font-size: .83rem; outline: none; font-family: inherit;
+    flex: 1; min-width: 0;
+  }
+  select:focus, input:focus { border-color: var(--accent); }
+  option { background: #1e3a5f; }
+  button {
+    border: none; border-radius: 8px; padding: 7px 14px;
+    font-size: .83rem; font-weight: 600; cursor: pointer;
+    transition: filter .15s, transform .1s; color: #fff; font-family: inherit;
+  }
+  button:hover { filter: brightness(1.15); transform: translateY(-1px); }
+  button:active { transform: translateY(0); }
+  .btn-blue   { background: var(--accent); }
+  .btn-green  { background: var(--green); }
+  .btn-red    { background: var(--red); }
+  .btn-orange { background: var(--orange); }
+  .btn-purple { background: var(--purple); }
+  .btn-muted  { background: #334155; }
+
+  /* ── Score ── */
+  .score-ring {
+    display: flex; flex-direction: column; align-items: center;
+    padding: 18px 0 12px;
+  }
+  .score-val {
+    font-size: 3.2rem; font-weight: 700;
+    background: linear-gradient(135deg,#22c55e,#3b82f6);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    line-height: 1;
+  }
+  .score-label { font-size: .75rem; color: var(--muted); margin-top: 4px; }
+
+  /* ── Stats list ── */
+  .stat-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 9px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+  }
+  .stat-row:last-child { border-bottom: none; }
+  .stat-left { display: flex; align-items: center; gap: 10px; font-size: .86rem; }
+  .stat-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .stat-val { font-size: 1.1rem; font-weight: 700; }
+
+  /* ── Export / Email ── */
+  .btn-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px; }
+  .email-form { display: flex; flex-direction: column; gap: 7px; margin-top: 12px; }
+
+  /* ── Toast ── */
+  #toast {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+    background: #1e3a5f; border: 1px solid var(--accent);
+    color: #fff; padding: 10px 22px; border-radius: 10px;
+    font-size: .88rem; z-index: 999; opacity: 0;
+    transition: opacity .3s; pointer-events: none;
+  }
+  #toast.show { opacity: 1; }
+
+  /* ── Modal ── */
+  .modal-bg {
+    display: none; position: fixed; inset:0;
+    background: rgba(0,0,0,.65); z-index: 100;
+    align-items: center; justify-content: center;
+  }
+  .modal-bg.open { display: flex; }
+  .modal {
+    background: #162032; border: 1px solid var(--border);
+    border-radius: 16px; padding: 28px; width: 380px; max-width: 95vw;
+  }
+  .modal h2 { font-size: 1.05rem; font-weight: 700; margin-bottom: 16px; }
+  .modal label { font-size: .78rem; color: var(--muted); display: block; margin-bottom: 4px; }
+  .modal input { width: 100%; margin-bottom: 10px; }
+  .modal .actions { display: flex; gap: 8px; margin-top: 8px; }
+
+  /* ── Camera Ports CSS ── */
+  .cam-ports-container {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    align-items: center;
+    flex: 1;
+  }
+  .cam-port-btn {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.15);
+  }
+  .cam-port-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: var(--accent);
+    transform: translateY(-1px);
+  }
+  .cam-port-btn.active {
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.3), rgba(168, 85, 247, 0.3));
+    border: 1.5px solid var(--accent);
+    color: #fff;
+    box-shadow: 0 0 12px rgba(59, 130, 246, 0.4);
+  }
+  .cam-port-btn.switching {
+    border-color: var(--orange);
+    box-shadow: 0 0 12px rgba(249, 115, 22, 0.4);
+  }
+  .btn-status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #64748b;
+    transition: background 0.2s;
+  }
+  .cam-port-btn.active .btn-status-dot {
+    background: var(--green);
+    box-shadow: 0 0 8px var(--green);
+    animation: pulse 1.6s infinite;
+  }
+
+  /* ── Header Logo CSS ── */
+  .header-logo {
+    height: 42px;
+    max-width: 140px;
+    border-radius: 6px;
+    border: 1px solid rgba(255,255,255,0.15);
+    background: rgba(255,255,255,0.05);
+    padding: 3px;
+    object-fit: contain;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+    transition: transform 0.2s;
+  }
+  .header-logo:hover {
+    transform: scale(1.05);
+  }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- Header -->
+  <header class="header">
+    <div>
+      <h1>📡 Classroom Attention Analyzer</h1>
+      <p>AI Real-time monitoring — ระบบวิเคราะห์ความตั้งใจในห้องเรียน</p>
+    </div>
+    <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+      <div class="status-pill">
+        <div class="dot" id="rec-dot"></div>
+        <span id="rec-label">กำลังบันทึก</span>
+      </div>
+      <button class="btn-orange" onclick="toggleRec()">⏸ หยุดบันทึก</button>
+      <button class="btn-muted" onclick="confirmReset()">🔄 เริ่มใหม่</button>
+      <img src="/static/image/images.jfif" alt="Logo" class="header-logo" onerror="this.src='/static/image/Gemin.png'; this.onerror=function(){this.style.display='none';};">
+    </div>
+  </header>
+
+  <!-- Camera controls bar -->
+  <div class="panel" style="margin-bottom:18px">
+    <div class="panel-title">🎥 ตั้งค่ากล้อง <span id="cam-scan-status" style="font-size:.7rem;color:var(--muted);font-weight:400">กำลังตรวจสอบกล้อง...</span></div>
+    <div class="cam-row" style="display:flex; justify-content:space-between; align-items:center; width:100%; flex-wrap:wrap; gap:12px;">
+      <div id="cam-ports-container" class="cam-ports-container">
+        <!-- Dynamic Camera Port Buttons will be injected here -->
+      </div>
+      <div style="display:flex; gap:8px;">
+        <button class="btn-blue" id="btn-switch" onclick="switchCam()">🔀 สลับกล้อง</button>
+        <button class="btn-muted" onclick="scanCameras()" title="สแกนหากล้องใหม่">🔍 สแกนกล้อง</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main grid -->
+  <div class="grid">
+
+    <!-- Video column -->
+    <div style="display:flex;flex-direction:column;gap:18px">
+      <div class="panel" style="padding:14px">
+        <div class="video-wrap">
+          <img id="vid" src="/video_feed" alt="Video feed">
+          <div class="video-timer" id="timer">00:00:00</div>
+          <div class="rec-badge" id="rec-badge">
+            <div class="rec-dot"></div> REC
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right column -->
+    <div style="display:flex;flex-direction:column;gap:18px">
+
+      <!-- Score -->
+      <div class="panel">
+        <div class="panel-title">📊 คะแนนรวม</div>
+        <div class="score-ring">
+          <div class="score-val" id="score">100%</div>
+          <div class="score-label">Overall Attention Score</div>
+        </div>
+      </div>
+
+      <!-- Detailed stats -->
+      <div class="panel">
+        <div class="panel-title">📋 สถิติห้องเรียน</div>
+        <div class="stat-row">
+          <div class="stat-left"><div class="stat-dot" style="background:var(--accent)"></div> นักศึกษาในกล้อง</div>
+          <div class="stat-val" id="s-total">0</div>
+        </div>
+        <div class="stat-row">
+          <div class="stat-left"><div class="stat-dot" style="background:var(--green)"></div> ตั้งใจฟัง</div>
+          <div class="stat-val" style="color:var(--green)" id="s-att">0</div>
+        </div>
+        <div class="stat-row">
+          <div class="stat-left"><div class="stat-dot" style="background:var(--cyan)"></div> มองคอมพิวเตอร์</div>
+          <div class="stat-val" style="color:var(--cyan)" id="s-comp">0</div>
+        </div>
+        <div class="stat-row">
+          <div class="stat-left"><div class="stat-dot" style="background:var(--orange)"></div> เล่นมือถือ</div>
+          <div class="stat-val" style="color:var(--orange)" id="s-phone">0</div>
+        </div>
+        <div class="stat-row">
+          <div class="stat-left"><div class="stat-dot" style="background:var(--purple)"></div> คุยกัน</div>
+          <div class="stat-val" style="color:var(--purple)" id="s-talk">0</div>
+        </div>
+        <div class="stat-row">
+          <div class="stat-left"><div class="stat-dot" style="background:var(--red)"></div> หันไปทางอื่น</div>
+          <div class="stat-val" style="color:var(--red)" id="s-away">0</div>
+        </div>
+        <div class="stat-row" style="margin-top:8px;border-top:1px solid rgba(255,255,255,.08);padding-top:8px">
+          <div class="stat-left"><div class="stat-dot" style="background:#64748b"></div> ลุกออกจากห้อง (ครั้ง)</div>
+          <div class="stat-val" style="color:#94a3b8" id="s-leave">0</div>
+        </div>
+      </div>
+
+      <!-- Export -->
+      <div class="panel">
+        <div class="panel-title">💾 บันทึกรายงาน</div>
+        <div class="btn-row">
+          <button class="btn-green" onclick="exportFile('excel')">📊 Export Excel</button>
+          <button class="btn-red" onclick="exportFile('pdf')">📄 Export PDF</button>
+        </div>
+        <button class="btn-purple" style="width:100%" onclick="openEmailModal()">📧 ส่งสรุปทางอีเมล</button>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- Email Modal -->
+<div class="modal-bg" id="email-modal">
+  <div class="modal">
+    <h2>📧 ส่งสรุปผลทางอีเมล</h2>
+    <label>ส่งไปที่อีเมล (ผู้รับ)</label>
+    <input type="email" id="m-to" placeholder="teacher@school.ac.th">
+    <label>Gmail ของผู้ส่ง</label>
+    <input type="email" id="m-from" placeholder="sender@gmail.com">
+    <label>App Password (Gmail 16 ตัว)</label>
+    <input type="password" id="m-pass" placeholder="xxxx xxxx xxxx xxxx">
+    <div style="font-size:.72rem;color:#94a3b8;margin-bottom:8px">
+      ⚠️ ต้องเปิด 2FA ใน Gmail แล้วสร้าง App Password ที่ myaccount.google.com
+    </div>
+    <div class="actions">
+      <button class="btn-blue" style="flex:1" onclick="sendEmail()">ส่งเลย</button>
+      <button class="btn-muted" style="flex:1" onclick="closeModal()">ยกเลิก</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="toast"></div>
+
+<script>
+  let recording = true;
+  let switching = false;
+  let activePort = null;
+  let availablePorts = [];
+
+  // ── Camera scan ─────────────────────────────────────────────────────
+  const portLabels = {
+    0: 'Port 0 — กล้องหน้า (Built-in)',
+    1: 'Port 1 — กล้อง USB ตัวที่ 1',
+    2: 'Port 2 — กล้อง USB ตัวที่ 2',
+    3: 'Port 3 — กล้อง USB ตัวที่ 3',
+    4: 'Port 4 — กล้อง USB ตัวที่ 4',
+    5: 'Port 5 — กล้อง USB ตัวที่ 5',
+  };
+
+  function renderCamButtons() {
+    const container = document.getElementById('cam-ports-container');
+    container.innerHTML = '';
+    
+    availablePorts.forEach(p => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'cam-port-btn';
+      btn.dataset.port = p;
+      if (p === activePort) {
+        btn.classList.add('active');
+      }
+      
+      const dot = document.createElement('span');
+      dot.className = 'btn-status-dot';
+      btn.appendChild(dot);
+      
+      const text = document.createElement('span');
+      const label = portLabels[p] || `Port ${p}`;
+      text.textContent = label;
+      if(p !== 0) text.textContent += ' ✅';
+      btn.appendChild(text);
+      
+      btn.onclick = () => selectPort(p);
+      container.appendChild(btn);
+    });
+  }
+
+  async function selectPort(port) {
+    if (switching) return;
+    switching = true;
+    
+    const buttons = document.querySelectorAll('.cam-port-btn');
+    buttons.forEach(btn => {
+      if (parseInt(btn.dataset.port) === port) {
+        btn.classList.add('switching');
+        btn.querySelector('.btn-status-dot').style.background = 'var(--orange)';
+      }
+    });
+
+    const status = document.getElementById('cam-scan-status');
+    status.textContent = `กำลังเปิดกล้อง Port ${port}...`;
+    status.style.color = 'var(--orange)';
+
+    try {
+      const r = await fetch('/set_camera',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({port})
+      }).then(r=>r.json());
+
+      if(r.ok){
+        activePort = port;
+        const v = document.getElementById('vid');
+        v.src = '/video_feed?t=' + Date.now();
+        toast(`✅ ${r.msg || 'สลับกล้องสำเร็จ'}`);
+        status.textContent = `✅ กำลังใช้งาน Port ${port}`;
+        status.style.color = 'var(--green)';
+      } else {
+        toast(`❌ ${r.msg || 'สลับกล้องไม่สำเร็จ'}`, 5000);
+        status.textContent = `❌ เปิด Port ${port} ไม่สำเร็จ`;
+        status.style.color = 'var(--red)';
+      }
+    } catch(e) {
+      toast('❌ สลับกล้องไม่สำเร็จ');
+      status.textContent = '❌ มีข้อผิดพลาดในการเชื่อมต่อ';
+      status.style.color = 'var(--red)';
+    } finally {
+      switching = false;
+      renderCamButtons();
+    }
+  }
+
+  async function scanCameras() {
+    const status = document.getElementById('cam-scan-status');
+    status.textContent = 'กำลังสแกน...';
+    
+    try {
+      const res   = await fetch('/cameras').then(r=>r.json());
+      const ports = res.ports || [];
+
+      if(ports.length === 0){
+        availablePorts = [0, 1];
+        status.textContent = '⚠️ ไม่พบกล้อง USB — ใช้ Port 1 (ด้านหลัง)';
+        status.style.color = 'var(--orange)';
+        activePort = 1;
+      } else {
+        availablePorts = ports;
+        const usbPort = ports.find(p => p > 0);
+        const chosen  = usbPort !== undefined ? usbPort : ports[0];
+        activePort = chosen;
+        
+        if(usbPort !== undefined){
+          status.textContent = `✅ พบกล้อง USB ${ports.length} ตัว — กำลังเปิด Port ${usbPort}...`;
+          status.style.color = 'var(--green)';
+        } else {
+          status.textContent = `✅ พบกล้อง ${ports.length} ตัว — กำลังเปิด Port ${chosen}...`;
+          status.style.color = 'var(--green)';
+        }
+      }
+      
+      renderCamButtons();
+      await autoConnect(activePort);
+      status.textContent = `✅ กำลังใช้งาน Port ${activePort}`;
+      status.style.color = 'var(--green)';
+    } catch(e) {
+      status.textContent = 'ตรวจสอบกล้องไม่ได้';
+      status.style.color = 'var(--red)';
+      availablePorts = [0, 1];
+      activePort = 0;
+      renderCamButtons();
+    }
+  }
+
+  async function autoConnect(port) {
+    try {
+      await fetch('/set_camera',{method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({port})});
+      const v = document.getElementById('vid');
+      v.src = '/video_feed?t=' + Date.now();
+    } catch(e) {}
+  }
+
+  scanCameras();
+
+  function toast(msg, dur=3000) {
+    const t = document.getElementById('toast');
+    t.textContent = msg; t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), dur);
+  }
+
+  // ── Poll stats every second ────────────────────────────────────────────────
+  async function pollStats() {
+    try {
+      const d = await fetch('/stats').then(r=>r.json());
+      document.getElementById('score').textContent   = d.attention_score + '%';
+      document.getElementById('timer').textContent   = d.duration || '00:00:00';
+      document.getElementById('s-total').textContent = d.total;
+      document.getElementById('s-att').textContent   = d.attentive;
+      document.getElementById('s-comp').textContent  = d.computer;
+      document.getElementById('s-phone').textContent = d.phone;
+      document.getElementById('s-talk').textContent  = d.talking;
+      document.getElementById('s-away').textContent  = d.looking_away;
+      document.getElementById('s-leave').textContent = d.leaving;
+
+      // Score colour
+      const el = document.getElementById('score');
+      el.style.background = d.attention_score>=70
+        ? 'linear-gradient(135deg,#22c55e,#3b82f6)'
+        : d.attention_score>=40
+          ? 'linear-gradient(135deg,#f97316,#eab308)'
+          : 'linear-gradient(135deg,#ef4444,#f97316)';
+      el.style.webkitBackgroundClip = 'text';
+    } catch(e){}
+  }
+  setInterval(pollStats, 1000);
+
+  // ── Camera switch ─────────────────────────────────────────────────────
+  async function switchCam() {
+    if(switching) return;
+    if(availablePorts.length < 2) {
+      toast('ℹ️ มีกล้องให้เลือกใช้งานเพียงตัวเดียว');
+      return;
+    }
+    
+    const currentIndex = availablePorts.indexOf(activePort);
+    const nextIndex = (currentIndex + 1) % availablePorts.length;
+    const nextPort = availablePorts[nextIndex];
+    
+    const btn = document.getElementById('btn-switch');
+    btn.textContent = '⏳ กำลังสลับ...';
+    btn.disabled = true;
+    
+    await selectPort(nextPort);
+    
+    btn.textContent = '🔀 สลับกล้อง';
+    btn.disabled = false;
+  }
+
+  // ── Recording toggle ───────────────────────────────────────────────────────
+  async function toggleRec() {
+    const r = await fetch('/toggle_recording',{method:'POST'}).then(r=>r.json());
+    recording = r.recording;
+    const btn  = document.querySelector('[onclick="toggleRec()"]');
+    const dot  = document.getElementById('rec-dot');
+    const lbl  = document.getElementById('rec-label');
+    const badge= document.getElementById('rec-badge');
+    if(recording){
+      btn.textContent='⏸ หยุดบันทึก'; btn.className='btn-orange';
+      dot.classList.remove('off'); lbl.textContent='กำลังบันทึก';
+      badge.style.display='flex';
+    } else {
+      btn.textContent='▶ บันทึกต่อ'; btn.className='btn-green';
+      dot.classList.add('off'); lbl.textContent='หยุดบันทึกอยู่';
+      badge.style.display='none';
+    }
+    toast(recording ? '▶ กลับมาบันทึกข้อมูลแล้ว' : '⏸ หยุดบันทึกข้อมูลชั่วคราว');
+  }
+
+  // ── Reset ─────────────────────────────────────────────────────────────────
+  function confirmReset() {
+    if(!confirm('เริ่มต้นใหม่? ข้อมูลในรอบนี้จะถูกล้าง')) return;
+    fetch('/reset',{method:'POST'}).then(()=>toast('🔄 รีเซ็ตเซสชันเรียบร้อยแล้ว'));
+  }
+
+  // ── Export ─────────────────────────────────────────────────────────────────
+  function exportFile(type) {
+    window.open('/export/' + type);
+    toast(`📥 กำลังดาวน์โหลด ${type.toUpperCase()}...`);
+  }
+
+  // ── Email modal ─────────────────────────────────────────────────────────────
+  function openEmailModal(){ document.getElementById('email-modal').classList.add('open'); }
+  function closeModal()    { document.getElementById('email-modal').classList.remove('open'); }
+
+  async function sendEmail() {
+    const to   = document.getElementById('m-to').value.trim();
+    const from = document.getElementById('m-from').value.trim();
+    const pass = document.getElementById('m-pass').value;
+    if(!to||!from||!pass){ toast('⚠️ กรุณากรอกข้อมูลให้ครบ'); return; }
+    closeModal();
+    toast('📤 กำลังส่งอีเมล...');
+    const r = await fetch('/send_email',{method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({to_email:to, smtp_email:from, smtp_pass:pass})}).then(r=>r.json());
+    toast(r.ok ? `✅ ${r.msg}` : `❌ ${r.msg}`, 5000);
+  }
+</script>
+</body>
+</html>
