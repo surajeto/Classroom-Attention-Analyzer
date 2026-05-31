@@ -252,8 +252,9 @@ async def send_email(req: EmailRequest):
 # ── Start ─────────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 8000))
     print("╔══════════════════════════════════════╗")
-    print("║  Classroom Attention Analyzer  v2.0  ║")
-    print("║  http://localhost:8000               ║")
+    print(f"║  Classroom Attention Analyzer  v2.0  ║")
+    print(f"║  Port: {port}                         ║")
     print("╚══════════════════════════════════════╝")
-    uvicorn.run(app, host="0.0.0.0", port=8000, log_level="warning")
+    uvicorn.run(app, host="0.0.0.0", port=port, log_level="warning")
