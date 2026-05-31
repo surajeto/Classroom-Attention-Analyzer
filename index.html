@@ -258,7 +258,6 @@
 <div id="app">
 
   <!-- HTML5 Capture Elements (Hidden) -->
-  <video id="webcam-raw" style="display:none;" autoplay playsinline></video>
   <canvas id="canvas-raw" width="640" height="480" style="display:none;"></canvas>
 
   <!-- Header -->
@@ -309,10 +308,20 @@
     <div style="display:flex;flex-direction:column;gap:18px">
       <div class="panel" style="padding:14px">
         <div class="video-wrap">
-          <img id="vid" src="static/image/Gemin.png" alt="Video feed">
+          <!-- Live webcam (shown by default) -->
+          <video id="webcam-raw" autoplay playsinline style="width:100%; height:100%; object-fit:contain; display:block;"></video>
+          <!-- Processed AI Image (hidden by default) -->
+          <img id="vid" src="static/image/gemini.png" alt="Video feed" style="width:100%; height:100%; object-fit:contain; display:none;">
+          
           <div class="video-timer" id="timer">00:00:00</div>
           <div class="rec-badge" id="rec-badge">
             <div class="rec-dot"></div> REC
+          </div>
+          
+          <!-- Mode status indicator overlay -->
+          <div id="video-mode-badge" style="position:absolute; bottom:10px; left:10px; background:rgba(249,115,22,0.85); color:#fff; font-size:.72rem; font-weight:700; padding:4px 10px; border-radius:6px; letter-spacing:.05em; display:flex; align-items:center; gap:6px; box-shadow:0 2px 6px rgba(0,0,0,0.3); z-index:10;">
+            <div id="video-mode-dot" style="width:6px; height:6px; border-radius:50%; background:#fff; animation:pulse 1s infinite;"></div>
+            <span id="video-mode-label">⚠️ กล้องสด (ยังไม่ได้ต่อ AI)</span>
           </div>
         </div>
       </div>
@@ -435,6 +444,12 @@
       toast('❌ เชื่อมต่อหลังบ้านไม่สำเร็จ! กรุณาเปิด python main.py');
       status.textContent = '❌ เซิร์ฟเวอร์หลังบ้านไม่ตอบสนอง';
       status.style.color = 'var(--red)';
+      
+      document.getElementById('webcam-raw').style.display = 'block';
+      document.getElementById('vid').style.display = 'none';
+      const badge = document.getElementById('video-mode-badge');
+      badge.style.background = 'rgba(239,68,68,0.85)';
+      document.getElementById('video-mode-label').textContent = '❌ หลังบ้านปิดอยู่ (ใช้กล้องสด)';
     }
   }
 
@@ -463,11 +478,25 @@
       }).then(r => r.json());
       
       if (res.ok) {
+        document.getElementById('webcam-raw').style.display = 'none';
+        document.getElementById('vid').style.display = 'block';
         document.getElementById('vid').src = res.image;
+        
+        const badge = document.getElementById('video-mode-badge');
+        badge.style.background = 'rgba(34,197,94,0.85)';
+        document.getElementById('video-mode-label').textContent = '✅ AI วิเคราะห์สด';
+        
         updateStatsUI(res.stats);
+      } else {
+        throw new Error(res.msg || "AI Error");
       }
     } catch(e) {
       console.error(e);
+      document.getElementById('webcam-raw').style.display = 'block';
+      document.getElementById('vid').style.display = 'none';
+      const badge = document.getElementById('video-mode-badge');
+      badge.style.background = 'rgba(239,68,68,0.85)';
+      document.getElementById('video-mode-label').textContent = '❌ ขัดข้อง (ใช้กล้องสดแทน)';
     }
   }
 
