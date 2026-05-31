@@ -2,6 +2,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, StreamingResponse, FileResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
+from fastapi.middleware.cors import CORSMiddleware
 import uvicorn, cv2, os, smtplib
 import pandas as pd
 from pydantic import BaseModel
@@ -12,6 +13,15 @@ from reportlab.lib import colors as rl_colors
 from analyzer import ClassroomAnalyzer, scan_cameras_safe
 
 app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 templates = Jinja2Templates(directory="templates")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
@@ -26,6 +36,9 @@ class EmailRequest(BaseModel):
     to_email:   str
     smtp_email: str
     smtp_pass:  str
+
+class FrameData(BaseModel):
+    image: str
 
 # ── Routes ────────────────────────────────────────────────────────────────────
 
@@ -46,6 +59,32 @@ def gen_frames():
 @app.get("/video_feed")
 async def video_feed():
     return StreamingResponse(gen_frames(), media_type="multipart/x-mixed-replace; boundary=frame")
+
+@app.post("/process_frame")
+async def process_frame_api(data: FrameData):
+    import base64
+    import numpy as np
+    import asyncio
+    try:
+        header, encoded = data.image.split(",", 1) if "," in data.image else ("", data.image)
+        img_data = base64.b64decode(encoded)
+        nparr = np.frombuffer(img_data, np.uint8)
+        frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+        if frame is None:
+            return {"ok": False, "msg": "Cannot decode image"}
+        loop = asyncio.get_event_loop()
+        processed_frame, stats = await loop.run_in_executor(None, analyzer.process_custom_frame, frame)
+        ret, buf = cv2.imencode(".jpg", processed_frame, [cv2.IMWRITE_JPEG_QUALITY, 80])
+        if not ret:
+            return {"ok": False, "msg": "Cannot encode processed frame"}
+        processed_base64 = base64.b64encode(buf).decode('utf-8')
+        return {
+            "ok": True,
+            "image": f"data:image/jpeg;base64,{processed_base64}",
+            "stats": stats
+        }
+    except Exception as e:
+        return {"ok": False, "msg": f"Error: {e}"}
 
 # ── Stats & controls ──────────────────────────────────────────────────────────
 

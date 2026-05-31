@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Classroom Attention Analyzer</title>
+<title>Classroom Attention Analyzer (GitHub Version)</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
   :root {
@@ -23,7 +23,7 @@
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   body {
     font-family: 'Inter', sans-serif;
-    background: var(--bg) url('/static/image/gemini.png') center/cover fixed;
+    background: var(--bg) url('static/image/gemini.png') center/cover fixed;
     color: var(--text);
     min-height: 100vh;
   }
@@ -265,7 +265,7 @@
   <header class="header">
     <div>
       <h1>📡 Classroom Attention Analyzer</h1>
-      <p>AI Real-time monitoring — ระบบวิเคราะห์ความตั้งใจในห้องเรียน</p>
+      <p>AI Real-time monitoring — ระบบวิเคราะห์ความตั้งใจในห้องเรียน (GitHub Pages)</p>
     </div>
     <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
       <div class="status-pill">
@@ -274,7 +274,7 @@
       </div>
       <button class="btn-orange" onclick="toggleRec()">⏸ หยุดบันทึก</button>
       <button class="btn-muted" onclick="confirmReset()">🔄 เริ่มใหม่</button>
-      <img src="/static/image/images.jfif" alt="Logo" class="header-logo" onerror="this.src='/static/image/gemini.png'; this.onerror=function(){this.style.display='none';};">
+      <img src="static/image/images.jfif" alt="Logo" class="header-logo" onerror="this.src='static/image/Gemin.png'; this.onerror=function(){this.style.display='none';};">
     </div>
   </header>
 
@@ -287,7 +287,7 @@
     
     <div style="display:flex; gap:12px; margin-bottom:14px; align-items:center; flex-wrap:wrap;">
       <label style="font-size:.8rem; color:var(--muted); font-weight:600;">ที่อยู่เซิร์ฟเวอร์ AI (Backend URL):</label>
-      <input type="text" id="backend-url-input" style="max-width:300px; flex:none;" placeholder="http://localhost:8000">
+      <input type="text" id="backend-url-input" value="http://localhost:8000" style="max-width:300px; flex:none;" placeholder="http://localhost:8000">
       <button class="btn-green" id="btn-connect-backend" onclick="connectBackend()">⚡ เชื่อมต่อหลังบ้าน</button>
     </div>
     
@@ -309,7 +309,7 @@
     <div style="display:flex;flex-direction:column;gap:18px">
       <div class="panel" style="padding:14px">
         <div class="video-wrap">
-          <img id="vid" src="/static/image/gemini.png" alt="Video feed">
+          <img id="vid" src="static/image/Gemin.png" alt="Video feed">
           <div class="video-timer" id="timer">00:00:00</div>
           <div class="rec-badge" id="rec-badge">
             <div class="rec-dot"></div> REC
@@ -403,15 +403,12 @@
 <script>
   let recording = true;
   let switching = false;
-  let backendUrl = window.location.origin;
+  let backendUrl = "http://localhost:8000";
   let backendConnected = false;
   let processingInterval = null;
   let localStream = null;
   let selectedDeviceId = null;
   let availablePorts = [];
-
-  // Set default URL input to current origin
-  document.getElementById('backend-url-input').value = window.location.origin;
 
   // ── Connection & Frame Loop ───────────────────────────────────────────
 

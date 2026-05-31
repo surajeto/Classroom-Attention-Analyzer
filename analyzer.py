@@ -173,30 +173,7 @@ class ClassroomAnalyzer:
 
     # ── main processing ────────────────────────────────────────────────────────
 
-    def process_frame(self):
-        # No camera yet → show instruction screen (sleep so we don't spin)
-        if self.cap is None or not self.cap.isOpened():
-            time.sleep(0.1)
-            return self._placeholder([
-                "ยังไม่ได้เลือกกล้อง",
-                "",
-                "กด  'สแกนกล้อง'  แล้วกด  'สลับกล้อง'",
-                "ในแผงควบคุมด้านบน",
-            ]), self.stats
-
-        # Read a frame (not under _hw_lock — read is lightweight & frequent)
-        ok, frame = self.cap.read()
-
-        if not ok or frame is None:
-            self._frame_errors += 1
-            time.sleep(0.1)
-            return self._placeholder([
-                f"กล้อง Port {self.camera_port} ไม่ตอบสนอง",
-                "",
-                "กรุณาตรวจสอบการเชื่อมต่อ",
-                "หรือเลือกกล้องใหม่",
-            ]), self.stats
-
+    def _analyze_frame(self, frame):
         self._frame_errors = 0
         self.frame_count  += 1
         now = time.time()
@@ -320,6 +297,40 @@ class ClassroomAnalyzer:
         cv2.circle(frame,(620,20),8,(0,220,80) if self.is_recording else (80,80,80),-1)
 
         return frame, self.stats
+
+    def process_frame(self):
+        # No camera yet → show instruction screen (sleep so we don't spin)
+        if self.cap is None or not self.cap.isOpened():
+            time.sleep(0.1)
+            return self._placeholder([
+                "ยังไม่ได้เลือกกล้อง",
+                "",
+                "กด  'สแกนกล้อง'  แล้วกด  'สลับกล้อง'",
+                "ในแผงควบคุมด้านบน",
+            ]), self.stats
+
+        # Read a frame (not under _hw_lock — read is lightweight & frequent)
+        ok, frame = self.cap.read()
+
+        if not ok or frame is None:
+            self._frame_errors += 1
+            time.sleep(0.1)
+            return self._placeholder([
+                f"กล้อง Port {self.camera_port} ไม่ตอบสนอง",
+                "",
+                "กรุณาตรวจสอบการเชื่อมต่อ",
+                "หรือเลือกกล้องใหม่",
+            ]), self.stats
+
+        return self._analyze_frame(frame)
+
+    def process_custom_frame(self, frame):
+        if frame is None:
+            return self._placeholder([
+                "ไม่พบภาพเฟรมจากเว็บแคม",
+                "กรุณาแชร์สิทธิ์กล้องในเบราว์เซอร์",
+            ]), self.stats
+        return self._analyze_frame(frame)
 
     def release(self):
         if self.cap:
